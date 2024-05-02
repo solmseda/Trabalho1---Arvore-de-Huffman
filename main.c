@@ -1,22 +1,28 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "codifica.h"
 
 int main() {
-    // Open the input text file in read mode
-    FILE* arqTexto = fopen("arquivo.txt", "r");
-    // Open the output binary file in write mode
-    FILE* arqBin = fopen("arquivo.bin", "wb");
+    // Abre o arquivo de texto para leitura
+    FILE* arqTexto = fopen("teste1.txt", "r");
+    if (arqTexto == NULL) {
+        printf("Não foi possível abrir o arquivo de texto para leitura.\n");
+        return 1;
+    }
 
-    // Create an array of compactadora structs representing the Huffman code table
-    struct compactadora tabela[32];
-    memset(tabela, 0, sizeof(tabela));
+    // Abre o arquivo binário para escrita
+    FILE* arqBin = fopen("teste1.bin", "wb");
+    if (arqBin == NULL) {
+        printf("Não foi possível abrir o arquivo binário para escrita.\n");
+        return 1;
+    }
 
-    // Compress the text file and write the compressed data to the binary file
+    // Cria a tabela de compactação
+    struct compactadora tabela[256];
+
+    // Compacta o arquivo de texto e grava os dados compactados no arquivo binário
     compacta(arqTexto, arqBin, tabela);
 
-    // Close the input and output files
+    // Fecha os arquivos
     fclose(arqTexto);
     fclose(arqBin);
 
