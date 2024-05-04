@@ -8,48 +8,60 @@
  * e escrever o resultado no arquivo binário.
  * */ 
 void compacta(FILE *arqTexto, FILE *arqBin, struct compactadora *v) {
-    char buffer = 0;
-    int bits_in_buffer = 0;
-    char c;
+    char caractere;
     unsigned int codigo;
-    int tamanho = 0;
-    int i;
+    int tamanho;
 
-    // ler o arquivo até o final
-    while ((c = fgetc(arqTexto)) != EOF) {
-        tamanho = 0;
-
-        // procura o caractere atual na interação da tabela de compactação
-        for (i = 0; i < 32; i++) {
-            if (v[i].simbolo == c) {
+    while ((caractere = fgetc(arqTexto)) != EOF) {
+        // Encontre o caractere na tabela de compactação
+        for (int i = 0; i < 32; i++) {
+            if (v[i].simbolo == caractere) {
                 codigo = v[i].codigo;
                 tamanho = v[i].tamanho;
                 break;
             }
         }
 
-        // Adicionar o código ao buffer
-        codigo <<= (32 - tamanho); // Shift left para a posição correta no buffer
-        buffer |= (codigo >> bits_in_buffer); // Adicionar os bits ao buffer
-        bits_in_buffer += tamanho;
-
-        // Escrever o buffer no arquivo binário quando estiver cheio
-        while (bits_in_buffer >= 8) {
-            fputc(buffer >> 24, arqBin); // Escrever o byte mais significativo do buffer
-            buffer <<= 8;
-            bits_in_buffer -= 8;
+        // Escreva o código compactado no arquivo binário
+        for (int j = tamanho - 1; j >= 0; j--) {
+            int bit = (codigo >> j) & 1;
+            fputc(bit + '0', arqBin);
         }
     }
 
-    // Adicionar o EOT ao final do arquivo binário
-    if (bits_in_buffer > 0) {
-        fputc(buffer >> 24, arqBin);
+    // Adicione o caractere de fim de arquivo (EOT) no final do arquivo binário
+    for (int j = v[31].tamanho - 1; j >= 0; j--) {
+        int bit = (v[31].codigo >> j) & 1;
+        fputc(bit + '0', arqBin);
     }
-    fputc(v[31].codigo, arqBin);
-
-    printf("Compactação concluída.\n");
 }
 
+/**
+ * Função para descompactar o arquivo binário com base na tabela de compactação.
+ *
+ * @param arqBin Ponteiro para o arquivo binário de entrada.
+ * @param arqTexto Ponteiro para o arquivo de texto de saída.
+ * @param v Tabela de compactação com símbolos e códigos.
+ */
 void descompacta(FILE *arqBin, FILE *arqTexto, struct compactadora *v) {
-    printf("\n\nDescompactando... TODO\n");
+    unsigned int codigo = 0;
+    int tamanho = 0;
+    char bit;
+
+    while ((bit = fgetc(arqBin)) != EOF) {
+        // Atualize o código e o tamanho conforme os bits lidos
+        codigo = (codigo << 1) | (bit - '0');
+        tamanho++;
+
+        // Verifique se o código corresponde a algum caractere na tabela 
+        // e escreve no arquivo
+        for (int i = 0; i < 32; i++) {
+            if (v[i].codigo == codigo && v[i].tamanho == tamanho) {
+                fputc(v[i].simbolo, arqTexto);
+                codigo = 0;
+                tamanho = 0;
+                break;
+            }
+        }
+    }
 }
