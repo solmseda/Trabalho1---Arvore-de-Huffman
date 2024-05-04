@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "codifica.h"
 
 int main() {
@@ -16,11 +17,18 @@ int main() {
         return 1;
     }
 
-    // Cria a tabela de compactação
-    struct compactadora tabela[256];
+    // Aloca dinamicamente a tabela de compactação
+    struct compactadora *v = (struct compactadora*)malloc(32 * sizeof(struct compactadora));
+    if (v == NULL) {
+        printf("Erro ao alocar memória para a tabela de compactação.\n");
+        return 1;
+    }
 
     // Compacta o arquivo de texto e grava os dados compactados no arquivo binário
-    compacta(arqTexto, arqBin, tabela);
+    compacta(arqTexto, arqBin, v);
+
+    // Libera a memória alocada para a tabela
+    free(v);
 
     // Fecha os arquivos
     fclose(arqTexto);

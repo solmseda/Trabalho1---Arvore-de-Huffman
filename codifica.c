@@ -3,285 +3,166 @@
 #include <string.h>
 #include "codifica.h"
 
-#define MAX_TREE_HT 100
+#define MAX_TREE_HT 10000
 
-struct No {
+typedef struct no {
     char simbolo;
-    unsigned int frequencia;
-    struct No *esquerda, *direita;
-};
-
-struct Heap {
-    unsigned int tamanho;
-    unsigned int capacidade;
-    struct No** array;
-};
+    int frequencia;
+    struct no *esquerda;
+    struct no *direita;
+} No;
 
 /**
- * Cria um novo nó com o símbolo e a frequência fornecidos.
+ * Cria um novo nó com o caractere e a frequência fornecidos.
+ */
+void criaNo(No **no, char simbolo, int frequencia) {
+    *no = (No *)malloc(sizeof(No));
+    (*no)->simbolo = simbolo;
+    (*no)->frequencia = frequencia;
+    (*no)->esquerda = NULL;
+    (*no)->direita = NULL;
+}
+
+/**
+ * Compara dois nós com base em suas frequências.
+ */
+int comparaNos(const void *a, const void *b) {
+    No *no1 = (No *)a;
+    No *no2 = (No *)b;
+    return no1->frequencia - no2->frequencia;
+}
+
+/**
+ * Combina dois nós em um novo nó.
+*/
+No *combinaNos(No *esquerda, No *direita) {
+    No *novoNo = (No *)malloc(sizeof(No));
+    novoNo->frequencia = esquerda->frequencia + direita->frequencia;
+    novoNo->esquerda = esquerda;
+    novoNo->direita = direita;
+    return novoNo;
+}
+
+/**
+ * Gera o codigo de Huffman para cada caractere na árvore de Huffman.
  *
- * @param simbolo O símbolo a ser armazenado no nó.
- * @param frequencia A frequência associada ao símbolo.
- * @return Um ponteiro para o novo nó criado.
+ * @param no O nó atual na árvore de Huffman.
+ * @param v O vetor de struct compactadora para armazenar os códigos de Huffman.
+ * @param codigo O código de Huffman atual.
+ * @param tamanho O tamanho do código de Huffman atual.
  */
-struct No* novoNo(char simbolo, unsigned int frequencia) {
-    struct No* temp = (struct No*)malloc(sizeof(struct No));
-    temp->simbolo = simbolo;
-    temp->frequencia = frequencia;
-    temp->esquerda = temp->direita = NULL;
+void geraCodigoHuffman(No *no, struct compactadora v[], char codigo[], int tamanho) {
+  if (no->esquerda == NULL && no->direita == NULL) {
+    v[(int)no->simbolo].codigo = (unsigned int)strtoul(codigo, NULL, 2);
+    v[(int)no->simbolo].tamanho = tamanho;
+    printf("Código Huffman para '%c': %s (%d bits).\n", no->simbolo, codigo, tamanho);
+    return;
+    }
 
-    printf("Criado novo nó com símbolo: %c e frequência: %u\n", simbolo, frequencia);
+  if (no->esquerda != NULL) {
+    char novoCodigo[MAX_TREE_HT];
+    strcpy(novoCodigo, codigo);
+    strcat(novoCodigo, "0");
+    geraCodigoHuffman(no->esquerda, v, novoCodigo, tamanho + 1);
+  }
 
-    return temp;
+  if (no->direita != NULL) {
+    char novoCodigo[MAX_TREE_HT];
+    strcpy(novoCodigo, codigo);
+    strcat(novoCodigo, "1");
+    geraCodigoHuffman(no->direita, v, novoCodigo, tamanho + 1);
+  }
 }
 
+
 /**
- * Cria um novo heap com a capacidade especificada.
+ * Constrói uma árvore de Huffman com base nos símbolos, frequências e tamanho fornecidos.
  *
- * @param capacidade A capacidade do heap.
- * @return Um ponteiro para o heap recém-criado.
+ * @param simbolos     Um array de símbolos.
+ * @param frequencias  Um array de frequências correspondentes aos símbolos.
+ * @param tamanho      O tamanho dos arrays.
+ * @param v            Um array de struct compactadora para armazenar a árvore de Huffman.
  */
-struct Heap* criarHeap(unsigned int capacidade) {
-    struct Heap* heap = (struct Heap*)malloc(sizeof(struct Heap));
-    heap->tamanho = 0;
-    heap->capacidade = capacidade;
-    heap->array = (struct No**)malloc(heap->capacidade * sizeof(struct No*));
+void constroiArvoreHuffman(char simbolos[], int frequencias[], int tamanho, struct compactadora v[]) {
+    // Cria uma fila de prioridade para armazenar os nós
+    No **fila = (No **)malloc(tamanho * sizeof(No *));
+    int indiceFila = 0;
 
-    printf("Criado novo heap com capacidade: %u\n", capacidade);
+    // Cria um nó para cada caractere e insere na fila de prioridade
+    for (int i = 0; i < tamanho; i++) {
+    No *no;
+    criaNo(&no, simbolos[i], frequencias[i]);
+    fila[indiceFila++] = no;
+    }
 
-    return heap;
+    // Constrói a árvore de Huffman
+    while (indiceFila > 1) {
+    // Remove os dois nós de menor frequência da fila
+    No *no1 = fila[--indiceFila];
+    No *no2 = fila[--indiceFila];
+
+    // Combina os nós em um novo nó
+    No *novoNo = combinaNos(no1, no2);
+    printf("Combinando nós '%c' (%d) e '%c' (%d) para formar novo nó (%d).\n",
+            no1->simbolo, no1->frequencia, no2->simbolo, no2->frequencia, novoNo->frequencia);
+
+    // Insere o novo nó na fila de prioridade
+    fila[indiceFila++] = novoNo;
+
+    // Atualiza a ordem da fila de acordo com a nova frequência
+    qsort(fila, indiceFila, sizeof(No *), comparaNos);
+    }
+
+    // Extrai o nó raiz da árvore de Huffman
+    No *raiz = fila[0];
+
+    // Gera os códigos de Huffman para cada caractere
+    geraCodigoHuffman(raiz, v, "", 0);
+
+    free(fila);
 }
 
+
 /**
- * Troca as posições de dois nós em um heap.
+ * Compacta o conteúdo de um arquivo de texto usando uma v de compactação.
  *
- * @param a Ponteiro para o primeiro nó.
- * @param b Ponteiro para o segundo nó.
+ * @param arqTexto O ponteiro para o arquivo de texto a ser compactado.
+ * @param arqBin O ponteiro para o arquivo binário onde o conteúdo compactado será armazenado.
+ * @param v vetor de 32 posições do tipo da estrutura representada anteriormente
  */
-void trocarNos(struct No** a, struct No** b) {
-    struct No* t = *a;
-    *a = *b;
-    *b = t;
-
-    printf("Nós trocados\n");
-}
-
-/**
- * @brief Função para manter a propriedade de min heap na árvore.
- * Verifica se o nó no índice fornecido viola a propriedade de min heap (ou seja, se é maior que qualquer um de seus filhos). 
- * Se violar, troca o nó com o menor de seus filhos e, em seguida, chama recursivamente a função no nó trocado.
- *
- * @param heap Ponteiro para a estrutura do heap.
- * @param indice Índice do nó que será verificado.
- */
-void minHeapify(struct Heap* heap, int indice) {
-    int menor = indice;
-    int esquerda = 2 * indice + 1;
-    int direita = 2 * indice + 2;
-
-    if (esquerda < heap->tamanho && heap->array[esquerda]->frequencia < heap->array[menor]->frequencia)
-        menor = esquerda;
-
-    if (direita < heap->tamanho && heap->array[direita]->frequencia < heap->array[menor]->frequencia)
-        menor = direita;
-
-    if (menor != indice) {
-        printf("Nó com índice %d é maior que seu filho. Trocando...\n", indice);
-        trocarNos(&heap->array[menor], &heap->array[indice]);
-        minHeapify(heap, menor);
-    }
-}
-
-int tamanhoUm(struct Heap* heap) {
-    return (heap->tamanho == 1);
-}
-
-/**
- * Extrai o elemento mínimo do heap.
- * 
- * Esta função remove e retorna o elemento mínimo do heap.
- * Ela atualiza a estrutura do heap substituindo o elemento raiz pelo último elemento
- * e em seguida reorganiza o heap para manter a propriedade de min-heap.
- * 
- * @param heap O heap do qual extrair o elemento mínimo.
- * @return O elemento mínimo extraído do heap.
- */
-struct No* extraiMin(struct Heap* heap) {
-    printf("Extraindo o nó mínimo da heap...\n");
-
-    struct No* temp = heap->array[0];
-    heap->array[0] = heap->array[heap->tamanho - 1];
-
-    printf("O nó mínimo tem o símbolo: %c e a frequência: %u\n", temp->simbolo, temp->frequencia);
-
-    --heap->tamanho;
-    minHeapify(heap, 0);
-    return temp;
-}
-
-/**
- * Insere um nó em um min heap.
- *
- * @param heap O heap onde o nó será inserido.
- * @param node O nó a ser inserido.
- */
-void insereMinHeap(struct Heap* heap, struct No* node) {
-    printf("Inserindo nó com símbolo: %c e frequência: %u na heap...\n", node->simbolo, node->frequencia);
-
-    ++heap->tamanho;
-    int i = heap->tamanho - 1;
-    while (i && node->frequencia < heap->array[(i - 1) / 2]->frequencia) {
-        heap->array[i] = heap->array[(i - 1) / 2];
-        i = (i - 1) / 2;
-    }
-    heap->array[i] = node;
-
-    printf("Nó inserido na heap\n");
-}
-
-/**
- * Constrói um heap mínimo a partir do heap fornecido.
- *
- * @param heap O heap a partir do qual construir o heap mínimo.
- */
-void constroiMinHeap(struct Heap* heap) {
-    printf("Construindo heap mínimo...\n");
-
-    int n = heap->tamanho - 1;
-    int i;
-    for (i = (n - 1) / 2; i >= 0; --i) {
-        minHeapify(heap, i);
-    }
-
-    printf("Heap mínimo construído\n");
-}
-
-/**
- * Constrói uma tabela de compactação com base em uma árvore binária fornecida.
- * 
- * @param raiz A raiz da árvore binária.
- * @param tabela A tabela de compactação a ser construída.
- * @param codigo O código binário que representa o caminho da raiz até um nó folha.
- * @param indice O índice atual no código binário.
- */
-void constroiTabelaCompactacao(struct No* raiz, struct compactadora* tabela, char* codigo, int indice) {
-    printf("Construindo tabela de compactação...\n");
-
-    if (raiz->esquerda) {
-        codigo[indice] = '0';
-        printf("Movendo para a esquerda na árvore. Código atual: %s\n", codigo);
-        constroiTabelaCompactacao(raiz->esquerda, tabela, codigo, indice + 1);
-    }
-
-    if (raiz->direita) {
-        codigo[indice] = '1';
-        printf("Movendo para a direita na árvore. Código atual: %s\n", codigo);
-        constroiTabelaCompactacao(raiz->direita, tabela, codigo, indice + 1);
-    }
-
-    if (!raiz->esquerda && !raiz->direita) {
-        tabela[(int)raiz->simbolo].simbolo = raiz->simbolo;
-        tabela[(int)raiz->simbolo].codigo = atoi(codigo);
-        tabela[(int)raiz->simbolo].tamanho = indice;
-        printf("Nó folha encontrado. Símbolo: %c, Código: %s, Tamanho: %d\n", raiz->simbolo, codigo, indice);
-    }
-}
-
-/**
- * Constrói uma árvore de Huffman com base nos símbolos e frequências fornecidos.
- * 
- * @param simbolos O array de símbolos.
- * @param frequencias O array de frequências correspondentes aos símbolos.
- * @param tamanho O tamanho dos arrays.
- * @param tabela A struct compactadora para armazenar os códigos de Huffman.
- */
-void constroiArvoreHuffman(char simbolos[], int frequencias[], int tamanho, struct compactadora* tabela) {
-    struct No *esquerda, *direita, *top;
-    struct Heap* heap = criarHeap(tamanho);
-
-    printf("Criando nós para cada símbolo...\n");
-    for (int i = 0; i < tamanho; ++i) {
-        heap->array[i] = novoNo(simbolos[i], frequencias[i]);
-        printf("Nó criado. Símbolo: %c, Frequência: %d\n", simbolos[i], frequencias[i]);
-    }
-
-    heap->tamanho = tamanho;
-    printf("Construindo a heap mínima...\n");
-    constroiMinHeap(heap);
-
-    printf("Construindo a árvore de Huffman...\n");
-    while (!tamanhoUm(heap)) {
-        esquerda = extraiMin(heap);
-        direita = extraiMin(heap);
-        printf("Nós extraídos. Símbolo esquerdo: %c, Frequência esquerda: %d, Símbolo direito: %c, Frequência direita: %d\n", esquerda->simbolo, esquerda->frequencia, direita->simbolo, direita->frequencia);
-
-        top = novoNo('$', esquerda->frequencia + direita->frequencia);
-        top->esquerda = esquerda;
-        top->direita = direita;
-        printf("Nó superior criado. Símbolo: %c, Frequência: %d\n", top->simbolo, top->frequencia);
-
-        insereMinHeap(heap, top);
-    }
-
-    printf("Construindo a tabela de compactação...\n");
-    constroiTabelaCompactacao(heap->array[0], tabela, "", 0);
-}
-
-/**
- * @brief Compacta um arquivo de texto usando a codificação de Huffman e escreve os dados compactos em um arquivo binário.
- * 
- * @param arqTexto Ponteiro para o arquivo de texto de entrada.
- * @param arqBin Ponteiro para o arquivo binário de saída.
- * @param tabela Array de structs compactadora representando a tabela de códigos de Huffman.
- */
-void compacta(FILE* arqTexto, FILE* arqBin, struct compactadora* tabela) {
-    // Inicializa os arrays de símbolos e frequências
+void compacta(FILE* arqTexto, FILE* arqBin, struct compactadora *v) {
     char simbolos[MAX_TREE_HT];
     int frequencias[MAX_TREE_HT] = {0};
     char simbolo;
     int tamanho = 0;
 
-    printf("Contando a frequência de cada símbolo no arquivo de texto...\n");
-    // conta a frequência de cada símbolo no arquivo de texto
     while ((simbolo = fgetc(arqTexto)) != EOF) {
-        if (simbolo == '\n') {
-            simbolos[tamanho] = simbolo;
-            frequencias[tamanho]++;
-            tamanho++;
-        } else {
-            simbolos[tamanho] = simbolo;
-            frequencias[tamanho]++;
-            tamanho++;
-        }
+        simbolos[tamanho] = simbolo;
+        frequencias[tamanho]++;
+        tamanho++;
     }
 
-    printf("Criando um símbolo de fim de arquivo (EOT) e atualizando a tabela de códigos de Huffman...\n");
-    // cria um símbolo de fim de arquivo (EOT) e atualiza a tabela de códigos de Huffman
     struct compactadora fim_arquivo;
-    fim_arquivo.simbolo = 31;  // Caractere de fim de arquivo (EOT)
-    fim_arquivo.codigo = tabela[31].codigo;
-    fim_arquivo.tamanho = tabela[31].tamanho;
-    tabela[31] = fim_arquivo;
+    fim_arquivo.simbolo = 31;
+    fim_arquivo.codigo = v[31].codigo;
+    fim_arquivo.tamanho = v[31].tamanho;
+    v[31] = fim_arquivo;
 
-    printf("Construindo a árvore de Huffman e a tabela de códigos de Huffman...\n");
-    // constrói a árvore de Huffman e a tabela de códigos de Huffman
-    constroiArvoreHuffman(simbolos, frequencias, tamanho, tabela);
+    printf("Construindo árvore de Huffman.\n");
+    constroiArvoreHuffman(simbolos, frequencias, tamanho, v);
+    
+    printf("Rebobinando arquivo de texto.\n");
 
-    printf("Retornando ao início do arquivo de texto...\n");
-    // retorna ao início do arquivo de texto
     rewind(arqTexto);
 
-    printf("Inicializando um buffer de 8 bits para armazenar os códigos de Huffman...\n");
-    // inicializa um buffer de 8 bits para armazenar os códigos de Huffman
     char buffer[MAX_TREE_HT];
     memset(buffer, '\0', sizeof(buffer));
     int indice_buffer = 0;
 
-    printf("Escrevendo os códigos de Huffman no arquivo binário...\n");
-    // escreve os códigos de Huffman no arquivo binário
+    printf("Escrevendo códigos de Huffman no arquivo binário.\n");
     while ((simbolo = fgetc(arqTexto)) != EOF) {
-        int codigo = tabela[(int)simbolo].codigo;
-        int tamanho = tabela[(int)simbolo].tamanho;
+        int codigo = v[(int)simbolo].codigo;
+        int tamanho = v[(int)simbolo].tamanho;
         int i;
         for (i = 0; i < tamanho; i++) {
             int bit = (codigo >> (tamanho - i - 1)) & 1;
@@ -295,10 +176,8 @@ void compacta(FILE* arqTexto, FILE* arqBin, struct compactadora* tabela) {
         }
     }
 
-    printf("Escrevendo o código de fim de arquivo (EOT) no arquivo binário...\n");
-    // escreve o código de fim de arquivo (EOT) no arquivo binário
-    int codigo_eot = tabela[31].codigo;
-    int tamanho_eot = tabela[31].tamanho;
+    int codigo_eot = v[31].codigo;
+    int tamanho_eot = v[31].tamanho;
     for (int i = 0; i < tamanho_eot; i++) {
         int bit = (codigo_eot >> (tamanho_eot - i - 1)) & 1;
         buffer[indice_buffer] = bit + '0';
@@ -310,9 +189,18 @@ void compacta(FILE* arqTexto, FILE* arqBin, struct compactadora* tabela) {
         }
     }
 
-    printf("Escrevendo o buffer restante no arquivo binário...\n");
-    // escreve o buffer restante no arquivo binário
     if (indice_buffer != 0) {
         fwrite(buffer, 1, sizeof(buffer), arqBin);
     }
+
+    printf("Compactação concluída.\n");
+
+    // Print the content of arqBin in hexadecimal
+    rewind(arqBin);
+    printf("Conteúdo do arquivo binário em hexadecimal:\n");
+    unsigned char byte;
+    while (fread(&byte, sizeof(byte), 1, arqBin) == 1) {
+        printf("%02X ", byte);
+    }
+    printf("\n");
 }
