@@ -4,7 +4,7 @@
 #include "codifica.h"
 
 /**
- * Função para compactar o arquivo de texto com base na tabela de compactação 
+ * Função para compactar o arquivo de texto com base na estrutura de compactação
  * e escrever o resultado no arquivo binário.
  * */ 
 void compacta(FILE *arqTexto, FILE *arqBin, struct compactadora *v) {
@@ -13,7 +13,7 @@ void compacta(FILE *arqTexto, FILE *arqBin, struct compactadora *v) {
     int tamanho;
 
     while ((caractere = fgetc(arqTexto)) != EOF) {
-        // Encontre o caractere na tabela de compactação
+        // Encontrar o caractere na estrutura de compactação
         for (int i = 0; i < 32; i++) {
             if (v[i].simbolo == caractere) {
                 codigo = v[i].codigo;
@@ -55,13 +55,18 @@ void descompacta(FILE *arqBin, FILE *arqTexto, struct compactadora *v) {
 
         // Verifique se o código corresponde a algum caractere na tabela 
         // e escreve no arquivo
-        for (int i = 0; i < 32; i++) {
+        for (int i = 0; i < 31; i++) {  // Não inclua o EOT na verificação
             if (v[i].codigo == codigo && v[i].tamanho == tamanho) {
                 fputc(v[i].simbolo, arqTexto);
                 codigo = 0;
                 tamanho = 0;
                 break;
             }
+        }
+
+        // Verifique se o código corresponde ao EOT (posição 31 de v)
+        if (codigo == v[31].codigo && tamanho == v[31].tamanho && bit == '0') {
+            break;  // Sai do loop ao encontrar o EOT
         }
     }
 }

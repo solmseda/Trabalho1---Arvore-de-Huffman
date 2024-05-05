@@ -1,2 +1,2 @@
-BOM\n
-DIA\n
+BOM
+DIA
